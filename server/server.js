@@ -169,11 +169,14 @@ app.post("/chat", async (req, res) => {
 
 /* ================= VOLUNTEER CHAT ================= */
 
-app.post("/chat-volunteer", async (req, res) => {
+
+app.post("/chat", async (req, res) => {
   try {
     const { message } = req.body;
-    if (!message)
+
+    if (!message) {
       return res.status(400).json({ error: "Message required" });
+    }
 
     const response = await fetch(
       "https://router.huggingface.co/v1/chat/completions",
@@ -189,7 +192,7 @@ app.post("/chat-volunteer", async (req, res) => {
             {
               role: "system",
               content:
-                "You are a trained NGO volunteer helping workers with salary, labor law, and workplace issues. Be polite, practical, and supportive.",
+                "You are a legal rights assistant. Provide general legal information only. Always add disclaimer: This is not legal advice.",
             },
             { role: "user", content: message },
           ],
@@ -198,16 +201,34 @@ app.post("/chat-volunteer", async (req, res) => {
       }
     );
 
-    const data = await response.json();
-    const botReply =
-      data.choices?.[0]?.message?.content || "No response";
+    const responseText = await response.text();
 
-    res.json({ reply: botReply });
+    console.log("Hugging Face status:", response.status);
+    console.log("Hugging Face response:", responseText);
+
+    if (!response.ok) {
+      return res.status(502).json({
+        error: "AI provider request failed",
+      });
+    }
+
+    const data = JSON.parse(responseText);
+    const botReply = data.choices?.[0]?.message?.content;
+
+    if (!botReply) {
+      console.error("Unexpected AI response format:", data);
+      return res.status(502).json({
+        error: "AI returned an empty response",
+      });
+    }
+
+    return res.json({ reply: botReply });
   } catch (error) {
-    console.error("❌ Volunteer Chat Error:", error);
-    res.status(500).json({ error: "Volunteer LLM error" });
+    console.error("Chat Error:", error);
+    return res.status(500).json({ error: "LLM error" });
   }
 });
+
 
 /* ================= TRANSLATE ROUTE ================= */
 
